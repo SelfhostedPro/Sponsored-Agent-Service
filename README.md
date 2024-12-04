@@ -13,9 +13,14 @@ A streamlined Kubernetes-based system designed to handle sponsored agent informa
 - Auto Healing
 - Stateless so no need for stateful set and additional storage cost
 
+### Networking
+- Utilizing Istio service mesh
+- Sidecars in each pod enable mTLS communication with any services they may need to communicate
+
 ### Storage
 - Metrics gathered by elastic agent and pushed to elasticsearch
 - Agent Data is gathered from the CRM (could implement caching here if needed as well)
+- Postgres can be in cluster or a managed service.
 
 ### Caching/CDN
 - Cloud CDN for caching agent service responses and assets

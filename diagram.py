@@ -6,7 +6,7 @@ from diagrams.gcp.network import CDN, Armor, LoadBalancing
 from diagrams.onprem.client import Users
 
 # Custom
-from diagrams.custom import Custom
+from diagrams.custom import Custom, Node
 from urllib.request import urlretrieve
 
 
@@ -25,8 +25,7 @@ from diagrams.k8s.network import Service
 
 # Observability
 from diagrams.elastic.agent import Agent
-from diagrams.elastic.elasticsearch import Elasticsearch, Stack
-from diagrams.elastic.observability import Metrics, Logs, Observability
+from diagrams.elastic.elasticsearch import Stack
 
 # Workflows
 from diagrams.onprem.gitops import Argocd
@@ -41,12 +40,12 @@ urlretrieve(envoy_url, envoy_logo)
 graph_attr = {"concentrate": "false", "splines": "spline"}
 
 edge_attr = {
-    "minlen": "2",
+    "minlen": "1.5",
 }
 
 
 def data_edge(label: str, **attrs: dict[str, str]):
-    return Edge(label=label, color="red", **attrs)
+    return Edge(label=label, color="firebrick", **attrs)
 
 
 def metrics_edge(label: str, **attrs: dict[str, str]):
@@ -58,7 +57,7 @@ def management_edge(label: str, **attrs: dict[str, str]):
 
 
 def security_edge(label: str, **attrs: dict[str, str]):
-    return Edge(label=label, color="blue", style="dashed", **attrs)
+    return Edge(xlabel=label, color="blue", style="dashed", **attrs)
 
 
 with Diagram(
@@ -83,14 +82,25 @@ with Diagram(
         with Cluster("GKE Cluster"):
             es_agent = Agent("elastic agent")
             cluster_envoy = Custom("envoy proxy", envoy_logo)
+            agent_crm = Server("Agent CRM")
+            agent_db = PostgreSQL("sponsored agent db")
 
-            with Cluster("Deployment"):
-                agent_crm = Server("Agent CRM")
+            (
+                cluster_envoy
+                >> Edge(color="transparent")
+                >> agent_crm
+                >> Edge(color="transparent")
+                >> agent_db
+            )
+            with Cluster("Deployment", graph_attr={"splines": "curved"}):
                 gw = Istio("gateway")
                 net = gw >> Service("sponsored agent svc")
                 hpa = HPA("hpa")
-
-                pods = [Pod("sponsored agent\npod 1"), Pod("sponsored agent\npod 3"), Pod("sponsored agent\npod 2")]
+                pods = [
+                    Pod("sponsored agent\npod 1"),
+                    Pod("sponsored agent\npod 3"),
+                    Pod("sponsored agent\npod 2"),
+                ]
 
                 # Deployment Flow
                 (
@@ -108,23 +118,12 @@ with Diagram(
             workflows = Argocd("argo workflows")
             sm = Istio("service mesh")
 
-        sm >> management_edge("management") >> [cluster_envoy, other_envoy]
-        sm >> management_edge("management") >> gw
-
-
-    # Pod CRM Flow
-    (
-        agent_crm
-        << Edge(label="Agent Data", labelfloat="true", color="red", minlen="4", weight="1")
-        >> pods
-    )
-
     # Elastic Agent Data Flow
     (
         es_agent
         >> metrics_edge(label="metrics\nlogs\ntraces")
         >> cluster_envoy
-        >> Edge(label="mTLS", color="blue", style="dashed", weight="1")
+        >> Edge(label="mTLS", color="blue", style="dashed", weight="5")
         << other_envoy
         >> metrics_edge(label="metrics\nlogs\ntraces")
         >> es
@@ -151,4 +150,13 @@ with Diagram(
         >> sendgrid
         >> metrics_edge("agent metrics", weight="0")
         >> agents
+    )
+
+    # Service Mesh Management Flow
+    (
+        [gw, cluster_envoy]
+        << management_edge("management")
+        << sm
+        >> management_edge("management")
+        >> other_envoy
     )
